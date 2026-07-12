@@ -1,0 +1,316 @@
+/* style.css
+   Bright, colorful, modern styling for FlashEspañol.
+   Mobile-first, single-column layout that scales up nicely on desktop. */
+
+:root {
+  /* "Spanish sun & tile" — warm saffron/terracotta over a deep ink base.
+     Dominant warm tones with a single cool teal accent for contrast. */
+  --color-bg-1: #f4a259;   /* saffron  */
+  --color-bg-2: #e76f51;   /* terracotta */
+  --color-bg-3: #7a2e3a;   /* deep sangria */
+  --color-card-front: #fdf6ec; /* warm cream, not stark white */
+  --color-card-back: #ffd670;  /* golden */
+  --color-primary: #bc4749;    /* clay red */
+  --color-accent: #2a9d8f;     /* teal — the one cool note */
+  --color-known: #2a9d8f;
+  --color-known-dark: #1e7d72;
+  --color-learning: #ee6c4d;
+  --color-learning-dark: #d1492b;
+  --color-text: #3a2318;       /* warm espresso, not cold navy */
+  --color-text-light: #9c7a63;
+  --shadow: 0 12px 34px rgba(58, 35, 24, 0.32);
+  --radius: 20px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(255, 224, 138, 0.55), transparent 42%),
+    radial-gradient(circle at 85% 78%, rgba(122, 46, 58, 0.55), transparent 50%),
+    linear-gradient(160deg, var(--color-bg-1), var(--color-bg-2) 48%, var(--color-bg-3));
+  background-attachment: fixed;
+  color: var(--color-text);
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px 48px;
+}
+
+.app {
+  width: 100%;
+  max-width: 480px;
+}
+
+/* Header */
+.app-header {
+  text-align: center;
+  color: #fff;
+  margin-bottom: 20px;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  opacity: 0.95;
+  font-weight: 500;
+}
+
+/* Progress */
+.progress-section {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+
+.progress-stats {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+#known-count {
+  color: var(--color-known-dark);
+}
+
+#learning-count {
+  color: var(--color-learning-dark);
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 10px;
+  background: #f0e0cf;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--color-known), #57c9bb);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* Mode toggle */
+.mode-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.mode-btn:hover {
+  transform: translateY(-1px);
+}
+
+.mode-btn.active {
+  background: #ffffff;
+  color: var(--color-primary);
+  box-shadow: var(--shadow);
+}
+
+/* Card area */
+.card-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.card-counter {
+  color: #fff;
+  font-weight: 600;
+  margin-bottom: 10px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.card-scene {
+  width: 100%;
+  height: 260px;
+  perspective: 1200px;
+  margin-bottom: 20px;
+}
+
+.card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  transform-style: preserve-3d;
+  transition: transform 0.5s ease;
+}
+
+.card.flipped {
+  transform: rotateY(180deg);
+}
+
+.card-face {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  backface-visibility: hidden;
+  box-shadow: var(--shadow);
+  padding: 20px;
+  text-align: center;
+}
+
+.card-front {
+  background: var(--color-card-front);
+}
+
+.card-back {
+  background: var(--color-card-back);
+  transform: rotateY(180deg);
+}
+
+.card-label {
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-light);
+}
+
+.card-word {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.flip-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-light);
+  font-style: italic;
+}
+
+.empty-state {
+  color: #fff;
+  font-weight: 600;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius);
+  padding: 40px 20px;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+/* Grade buttons */
+.grade-buttons {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.grade-btn {
+  flex: 1;
+  padding: 14px 10px;
+  border: none;
+  border-radius: 14px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.grade-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
+
+.grade-btn:active {
+  transform: translateY(0);
+}
+
+.learning-btn {
+  background: linear-gradient(135deg, var(--color-learning), var(--color-learning-dark));
+}
+
+.known-btn {
+  background: linear-gradient(135deg, var(--color-known), var(--color-known-dark));
+}
+
+/* Nav buttons */
+.nav-buttons {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.nav-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.nav-btn:hover {
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+/* Footer */
+.app-footer {
+  text-align: center;
+  margin-top: 24px;
+}
+
+.reset-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: underline;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.reset-btn:hover {
+  color: #fff;
+}
+
+/* Small screens */
+@media (max-width: 360px) {
+  .card-word {
+    font-size: 1.6rem;
+  }
+}
