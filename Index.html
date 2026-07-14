@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>STA_TaskHazCon · Daily Task Hazard & Control Assessment</title>
+<style>
+  /* ============================================================
+     STA_TaskHazCon — single-file safety dashboard
+     Aesthetic: industrial site-signage. Charcoal + hi-vis amber.
+     No frameworks, no external libraries, fully offline.
+     ============================================================ */
+
+  :root{
+    --bg:#14161b;
+    --bg-2:#1b1e25;
+    --panel:#20242d;
+    --panel-2:#262b35;
+    --line:#333a47;
+    --ink:#eef1f6;
+    --ink-dim:#9aa4b5;
+    --ink-faint:#6b7486;
+    --amber:#ffc400;
+    --amber-deep:#f5a300;
+    --red:#ff5a52;
+    --red-deep:#c8362f;
+    --green:#36c98a;
+    --blue:#54a0ff;
+    --hi:#0c0d11;
+    --display:'Bahnschrift','DIN Alternate','Oswald','Arial Narrow',
+              'Segoe UI Semibold',sans-serif;
+    --mono:ui-monospace,'Cascadia Code','Consolas','SF Mono',Menlo,monospace;
+    --body:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',sans-serif;
+    --radius:14px;
+    --shadow:0 24px 60px -28px rgba(0,0,0,.85);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:var(--body);
+    color:var(--ink);
+    background:
+      radial-gradient(1200px 700px at 80% -10%, rgba(255,196,0,.08), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(84,160,255,.06), transparent 55%),
+      var(--bg);
+    min-height:100vh;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    letter-spacing:.1px;
+  }
+
+  /* hazard stripe used as decorative motif */
+  .stripe{
+    height:8px;
+    background:repeating-linear-gradient(
+      -45deg,var(--amber) 0 18px,var(--hi) 18px 36px);
+  }
+
+  .wrap{max-width:1180px;margin:0 auto;padding:0 22px 80px;}
+
+  /* ---------- Top bar ---------- */
+  header.top{
+    position:sticky;top:0;z-index:30;
+    background:rgba(20,22,27,.82);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .top-inner{
+    max-width:1180px;margin:0 auto;padding:14px 22px;
+    display:flex;align-items:center;gap:16px;
+  }
+  .brand{display:flex;align-items:center;gap:14px;}
+  .logo{
+    width:46px;height:46px;flex:none;border-radius:11px;
+    background:linear-gradient(135deg,var(--amber),var(--amber-deep));
+    color:var(--hi);display:grid;place-items:center;
+    font-family:var(--display);font-size:26px;font-weight:700;
+    box-shadow:0 8px 22px -8px rgba(255,196,0,.6);
+    position:relative;overflow:hidden;
+  }
+  .logo::after{
+    content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(-45deg,rgba(0,0,0,.18) 0 4px,transparent 4px 9px);
+    opacity:.5;
+  }
+  .brand h1{
+    font-family:var(--display);margin:0;font-size:24px;font-weight:700;
+    letter-spacing:.5px;line-height:1;
+  }
+  .brand .sub{
+    font-family:var(--mono);font-size:11px;color:var(--ink-faint);
+    letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;
+  }
+  .top-meta{margin-left:auto;text-align:right;font-family:var(--mono);
+    font-size:11px;color:var(--ink-faint);letter-spacing:.5px;}
+  .top-meta b{color:var(--amber);}
+
+  /* ---------- Section labels ---------- */
+  .kicker{
+    font-family:var(--mono);font-size:11px;letter-spacing:3px;
+    text-transform:uppercase;color:var(--amber);margin:0 0 10px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .kicker::before{content:"";width:26px;height:2px;background:var(--amber);}
+
+  /* ---------- Panels ---------- */
+  .panel{
+    background:linear-gradient(180deg,var(--panel),var(--bg-2));
+    border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+
+  /* ---------- Stage management ---------- */
+  .stage{display:none;animation:rise .5s cubic-bezier(.2,.7,.2,1);}
+  .stage.active{display:block;}
+  @keyframes rise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+
+  /* ===== STAGE 1 : Dashboard / intake ===== */
+  .hero{margin-top:34px;display:grid;grid-template-columns:1.25fr .75fr;gap:22px;}
+  @media(max-width:860px){.hero{grid-template-columns:1fr;}}
+
+  .hero-main{padding:30px;}
+  .hero-main h2{
+    font-family:var(--display);font-size:40px;line-height:1.02;margin:6px 0 12px;
+    letter-spacing:.3px;
+  }
+  .hero-main p.lead{color:var(--ink-dim);font-size:15px;margin:0 0 24px;max-width:46ch;}
+
+  label.fld{
+    display:block;font-family:var(--mono);font-size:11px;letter-spacing:2px;
+    text-transform:uppercase;color:var(--ink-dim);margin-bottom:9px;
+  }
+  textarea#taskDesc{
+    width:100%;min-height:108px;resize:vertical;
+    background:var(--hi);color:var(--ink);
+    border:1px solid var(--line);border-left:4px solid var(--amber);
+    border-radius:10px;padding:15px 16px;font-family:var(--body);font-size:16px;
+    line-height:1.45;outline:none;transition:border-color .2s,box-shadow .2s;
+  }
+  textarea#taskDesc:focus{border-color:var(--amber);
+    box-shadow:0 0 0 3px rgba(255,196,0,.15);}
+  textarea#taskDesc::placeholder{color:var(--ink-faint);}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 26px;}
+  .chip{
+    font-family:var(--mono);font-size:11px;letter-spacing:.5px;
+    background:var(--panel-2);border:1px solid var(--line);color:var(--ink-dim);
+    padding:7px 11px;border-radius:999px;cursor:pointer;transition:.18s;
+  }
+  .chip:hover{border-color:var(--amber);color:var(--ink);
+    transform:translateY(-1px);}
+
+  /* Buttons */
+  .btn{
+    font-family:var(--display);font-size:17px;letter-spacing:.6px;
+    border:none;border-radius:11px;padding:15px 26px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:10px;transition:.18s;
+    text-transform:uppercase;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,var(--amber),var(--amber-deep));
+    color:var(--hi);box-shadow:0 14px 30px -12px rgba(255,196,0,.7);
+  }
+  .btn-primary:hover{transform:translateY(-2px);
+    box-shadow:0 18px 36px -12px rgba(255,196,0,.85);}
+  .btn-primary:active{transform:translateY(0);}
+  .btn-ghost{
+    background:var(--panel-2);color:var(--ink);border:1px solid var(--line);
+    font-size:13px;padding:12px 18px;
+  }
+  .btn-ghost:hover{border-color:var(--amber);color:var(--amber);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+
+  /* hero side card */
+  .hero-side{padding:26px;display:flex;flex-direction:column;gap:18px;
+    background:
+      repeating-linear-gradient(-45deg,rgba(255,196,0,.04) 0 12px,transparent 12px 24px),
+      linear-gradient(180deg,var(--panel),var(--bg-2));}
+  .info-row{display:flex;gap:14px;align-items:flex-start;}
+  .info-ico{
+    width:38px;height:38px;flex:none;border-radius:9px;display:grid;place-items:center;
+    background:var(--hi);border:1px solid var(--line);font-size:18px;
+  }
+  .info-row h4{margin:0 0 3px;font-family:var(--display);font-size:17px;letter-spacing:.4px;}
+  .info-row p{margin:0;color:var(--ink-dim);font-size:13px;line-height:1.45;}
+
+  /* ===== STAGE 2 : Step-by-step intake flow ===== */
+  .flow-head{display:flex;align-items:flex-end;justify-content:space-between;
+    margin-top:30px;gap:20px;flex-wrap:wrap;}
+  .flow-head h2{font-family:var(--display);font-size:30px;margin:6px 0 0;letter-spacing:.3px;}
+  .flow-task{color:var(--ink-dim);font-size:14px;margin-top:6px;max-width:60ch;}
+
+  .progress-shell{margin:22px 0 8px;}
+  .progress-meta{display:flex;justify-content:space-between;
+    font-family:var(--mono);font-size:11px;letter-spacing:1.5px;
+    text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px;}
+  .progress-track{height:8px;background:var(--hi);border:1px solid var(--line);
+    border-radius:999px;overflow:hidden;}
+  .progress-fill{height:100%;width:0;border-radius:999px;
+    background:linear-gradient(90deg,var(--amber-deep),var(--amber));
+    transition:width .45s cubic-bezier(.2,.7,.2,1);}
+
+  .pips{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px;}
+  .pip{width:28px;height:6px;border-radius:3px;background:var(--line);transition:.3s;}
+  .pip.done{background:var(--amber-deep);}
+  .pip.current{background:var(--amber);box-shadow:0 0 0 3px rgba(255,196,0,.2);}
+
+  .step-card{margin-top:22px;padding:30px;}
+  .step-tag{
+    font-family:var(--mono);font-size:12px;letter-spacing:2px;color:var(--amber);
+    display:inline-flex;align-items:center;gap:8px;
+  }
+  .step-num{
+    background:var(--amber);color:var(--hi);font-weight:700;border-radius:6px;
+    padding:2px 9px;font-family:var(--display);font-size:14px;letter-spacing:1px;
+  }
+  .step-card h3{font-family:var(--display);font-size:27px;margin:12px 0 4px;
+    letter-spacing:.3px;line-height:1.12;}
+
+  .haz-list{margin-top:22px;display:flex;flex-direction:column;gap:14px;}
+  .haz{
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;
+    background:var(--bg-2);animation:rise .4s both;
+  }
+  .haz-top{display:flex;align-items:center;gap:12px;padding:14px 16px;
+    border-left:5px solid var(--amber);}
+  .haz.sev-High .haz-top{border-left-color:var(--red);}
+  .haz.sev-Medium .haz-top{border-left-color:var(--amber);}
+  .haz.sev-Low .haz-top{border-left-color:var(--green);}
+  .haz-name{font-weight:600;font-size:15px;flex:1;}
+  .sev-badge{
+    font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
+    padding:4px 9px;border-radius:999px;border:1px solid;white-space:nowrap;
+  }
+  .sev-High .sev-badge{color:var(--red);border-color:rgba(255,90,82,.5);background:rgba(255,90,82,.1);}
+  .sev-Medium .sev-badge{color:var(--amber);border-color:rgba(255,196,0,.5);background:rgba(255,196,0,.1);}
+  .sev-Low .sev-badge{color:var(--green);border-color:rgba(54,201,138,.5);background:rgba(54,201,138,.1);}
+  .ctrl-wrap{padding:4px 16px 16px 21px;}
+  .ctrl-wrap .ct-label{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;
+    text-transform:uppercase;color:var(--ink-faint);margin:10px 0 8px;}
+  .ctrl-wrap ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px;}
+  .ctrl-wrap li{display:flex;gap:10px;font-size:14px;color:var(--ink-dim);}
+  .ctrl-wrap li::before{content:"✓";color:var(--green);font-weight:700;flex:none;}
+
+  .flow-nav{display:flex;justify-content:space-between;gap:12px;margin-top:24px;}
+
+  /* ===== STAGE 3 : Results dashboard ===== */
+  .result-head{margin-top:30px;display:flex;justify-content:space-between;
+    align-items:flex-end;gap:20px;flex-wrap:wrap;}
+  .result-head h2{font-family:var(--display);font-size:32px;margin:6px 0 0;letter-spacing:.3px;}
+
+  .task-banner{
+    margin-top:20px;padding:20px 24px;border-radius:var(--radius);
+    border:1px solid var(--line);border-left:6px solid var(--amber);
+    background:linear-gradient(180deg,var(--panel),var(--bg-2));
+  }
+  .task-banner .lbl{font-family:var(--mono);font-size:11px;letter-spacing:2px;
+    text-transform:uppercase;color:var(--amber);margin-bottom:8px;}
+  .task-banner .val{font-size:18px;font-family:var(--display);letter-spacing:.3px;line-height:1.3;}
+
+  .stats{display:flex;gap:14px;flex-wrap:wrap;margin-top:18px;}
+  .stat{flex:1;min-width:130px;padding:16px 18px;border-radius:12px;
+    border:1px solid var(--line);background:var(--bg-2);}
+  .stat .n{font-family:var(--display);font-size:30px;line-height:1;color:var(--amber);}
+  .stat .t{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;
+    text-transform:uppercase;color:var(--ink-dim);margin-top:8px;}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0 14px;align-items:center;}
+  .toolbar .spacer{flex:1;}
+
+  .table-shell{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+    box-shadow:var(--shadow);}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  thead th{
+    font-family:var(--display);font-size:15px;letter-spacing:1px;text-transform:uppercase;
+    text-align:left;padding:16px 18px;background:var(--hi);color:var(--amber);
+    border-bottom:2px solid var(--amber-deep);
+  }
+  thead th .cn{font-family:var(--mono);font-size:10px;color:var(--ink-faint);
+    display:block;letter-spacing:1px;margin-bottom:2px;}
+  tbody td{padding:14px 18px;border-bottom:1px solid var(--line);vertical-align:top;
+    background:var(--panel);}
+  tbody tr:nth-child(even) td{background:var(--bg-2);}
+  td.col-step{font-family:var(--display);font-size:16px;letter-spacing:.3px;
+    border-right:1px solid var(--line);width:24%;}
+  td.col-step .sidx{display:inline-block;background:var(--amber);color:var(--hi);
+    font-weight:700;border-radius:5px;padding:1px 8px;margin-right:8px;font-size:13px;}
+  td.col-haz{width:32%;border-right:1px solid var(--line);}
+  td.col-haz .hz{display:flex;align-items:center;gap:8px;font-weight:600;}
+  td.col-haz .mini{font-family:var(--mono);font-size:9px;letter-spacing:.5px;
+    padding:2px 7px;border-radius:999px;border:1px solid;text-transform:uppercase;}
+  .mini.High{color:var(--red);border-color:rgba(255,90,82,.5);}
+  .mini.Medium{color:var(--amber);border-color:rgba(255,196,0,.5);}
+  .mini.Low{color:var(--green);border-color:rgba(54,201,138,.5);}
+  td.col-ctrl ul{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px;}
+  td.col-ctrl li{display:flex;gap:8px;color:var(--ink-dim);}
+  td.col-ctrl li::before{content:"›";color:var(--amber);font-weight:700;}
+
+  .toast{
+    position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(40px);
+    background:var(--green);color:var(--hi);font-family:var(--display);letter-spacing:.5px;
+    padding:13px 22px;border-radius:10px;font-size:15px;opacity:0;pointer-events:none;
+    transition:.35s cubic-bezier(.2,.7,.2,1);z-index:50;box-shadow:0 16px 40px -12px rgba(0,0,0,.7);
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  footer{margin-top:50px;padding-top:24px;border-top:1px solid var(--line);
+    font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.5px;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+
+  @media print{
+    header.top,.toolbar,.stripe,footer{display:none!important;}
+    body{background:#fff;color:#000;}
+    .table-shell{box-shadow:none;}
+    thead th{position:static;background:#eee;color:#000;}
+    tbody td{background:#fff!important;color:#000;}
+  }
+</style>
+</head>
+<body>
+
+<div class="stripe"></div>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <div class="logo">⚠</div>
+      <div>
+        <h1>STA_TaskHazCon</h1>
+        <div class="sub">Safety Task · Hazard &amp; Control</div>
+      </div>
+    </div>
+    <div class="top-meta">
+      DAILY RISK ASSESSMENT<br>
+      ASSESSED · <b id="todayDate">—</b>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ============ STAGE 1 : DASHBOARD / INTAKE ============ -->
+  <section class="stage active" id="stage-dash">
+    <div class="hero">
+      <div class="panel hero-main">
+        <p class="kicker">Daily Task Assessment</p>
+        <h2>Understand the hazards before the work begins.</h2>
+        <p class="lead">Describe today's task in your own words. Press
+          <b>Start Assessment</b> and the system walks you through each step,
+          surfacing the key hazards and the controls that keep your people safe.</p>
+
+        <label class="fld" for="taskDesc">Description of Daily Task</label>
+        <textarea id="taskDesc" placeholder="e.g. Scaffold erection at the north elevation of Building C"></textarea>
+
+        <div class="chips" id="chips"></div>
+
+        <button class="btn btn-primary" id="startBtn">▶ Start Assessment</button>
+      </div>
+
+      <div class="panel hero-side">
+        <p class="kicker" style="margin-bottom:4px;">How it works</p>
+        <div class="info-row">
+          <div class="info-ico">🪜</div>
+          <div><h4>Task Steps</h4><p>The job is broken into the key steps — never more than ten.</p></div>
+        </div>
+        <div class="info-row">
+          <div class="info-ico">⚠️</div>
+          <div><h4>Identify Hazards</h4><p>Up to five priority hazards are flagged for every step.</p></div>
+        </div>
+        <div class="info-row">
+          <div class="info-ico">🛡️</div>
+          <div><h4>Associated Controls</h4><p>Up to three practical control measures per hazard.</p></div>
+        </div>
+        <div class="info-row">
+          <div class="info-ico">📋</div>
+          <div><h4>Copy &amp; Export</h4><p>Copy the finished table or download it as a CSV.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STAGE 2 : STEP-BY-STEP FLOW ============ -->
+  <section class="stage" id="stage-flow">
+    <div class="flow-head">
+      <div>
+        <p class="kicker">Intake Flow</p>
+        <h2>Walk the task, step by step</h2>
+        <p class="flow-task" id="flowTask"></p>
+      </div>
+      <button class="btn btn-ghost" id="skipBtn">Skip to results ⇥</button>
+    </div>
+
+    <div class="progress-shell">
+      <div class="progress-meta">
+        <span id="progLabel">Step 1</span>
+        <span id="progPct">0%</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progFill"></div></div>
+      <div class="pips" id="pips"></div>
+    </div>
+
+    <div class="panel step-card" id="stepCard"></div>
+
+    <div class="flow-nav">
+      <button class="btn btn-ghost" id="prevBtn">‹ Previous</button>
+      <button class="btn btn-primary" id="nextBtn">Next Step ›</button>
+    </div>
+  </section>
+
+  <!-- ============ STAGE 3 : RESULTS DASHBOARD ============ -->
+  <section class="stage" id="stage-result">
+    <div class="result-head">
+      <div>
+        <p class="kicker">Assessment Complete</p>
+        <h2>Task Hazard &amp; Control Register</h2>
+      </div>
+      <button class="btn btn-ghost" id="restartBtn">↺ New Assessment</button>
+    </div>
+
+    <div class="task-banner">
+      <div class="lbl">Description of Daily Task</div>
+      <div class="val" id="resultTask"></div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="toolbar">
+      <button class="btn btn-primary" id="copyBtn">⧉ Copy Table</button>
+      <button class="btn btn-ghost" id="csvBtn">⤓ Download CSV</button>
+      <button class="btn btn-ghost" id="printBtn">🖨 Print / PDF</button>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost" id="backFlowBtn">‹ Back to flow</button>
+    </div>
+
+    <div class="table-shell">
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th><span class="cn">COLUMN 1</span>Task Steps</th>
+            <th><span class="cn">COLUMN 2</span>Identify Hazards</th>
+            <th><span class="cn">COLUMN 3</span>Associated Controls</th>
+          </tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <span>STA_TaskHazCon · Personal Daily Risk Assessment Service</span>
+    <span id="footMeta"></span>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   KNOWLEDGE BASE
+   Curated task templates + keyword-driven generic builder.
+   Each step: {step, hazards:[{h, sev, c:[...]}]}
+   Limits enforced: <=10 steps, <=5 hazards/step, <=3 controls/hazard.
+   ============================================================ */
+
+const TEMPLATES = [
+{
+  match:['scaffold'],
+  steps:[
+    {step:'Transfer & offload scaffold material to the work area',hazards:[
+      {h:'Manual handling of heavy / awkward tubes, boards & fittings',sev:'High',c:['Use mechanical aids (telehandler, gin wheel, hoist) where possible','Team-lift heavy items using correct kinetic technique','Set up a laydown area close to the work face']},
+      {h:'Vehicle / plant movement during delivery & offload',sev:'High',c:['Segregate pedestrians from the delivery zone with barriers','Use a trained banksman to direct vehicles','Maintain exclusion zone until offload complete']},
+      {h:'Materials falling from the delivery vehicle',sev:'Medium',c:['Release load restraints from the safe (uphill) side','Stand clear of unstable stacks while strapping is removed','Stack components on firm, level ground']}
+    ]},
+    {step:'Inspect & prepare the ground / work area',hazards:[
+      {h:'Soft, uneven or sloping ground causing instability',sev:'High',c:['Use base plates and sole boards on firm ground','Level the ground or use adjustable bases','Avoid erection over voids, drains or excavations']},
+      {h:'Overhead services & power lines',sev:'High',c:['Identify overhead lines and maintain safe clearances','Use goal posts / barriers to mark exclusion limits','Consult utility provider for isolation if required']},
+      {h:'Underground services beneath base loads',sev:'Medium',c:['Review service drawings before loading the ground','Use spreader boards to distribute point loads','Avoid siting standards over known service runs']}
+    ]},
+    {step:'Erect the standards (vertical tubes) & fix base',hazards:[
+      {h:'Standards toppling before being tied / braced',sev:'High',c:['Install bracing as the lift progresses, not after','Tie in to the structure at the required centres','Do not leave free-standing standards unsupported']},
+      {h:'Trapped / crushed hands & fingers in couplers',sev:'Medium',c:['Wear cut-resistant gloves','Keep hands clear of pinch points when seating fittings','Use correct podger / spanner, not improvised tools']}
+    ]},
+    {step:'Install ledgers & transoms',hazards:[
+      {h:'Falls from height while reaching to fix components',sev:'High',c:['Work from a fully boarded lift with edge protection','Use a personal fall-arrest system where edge protection is incomplete','Follow a recognised safe method (advanced guardrail) erection']},
+      {h:'Dropped components striking persons below',sev:'High',c:['Establish an exclusion zone beneath the work','Use tool lanyards and fitting bags','Never throw or drop components to the ground']},
+      {h:'Incorrect / loose coupler torque',sev:'Medium',c:['Tighten couplers to the specified torque','Use only compatible, inspected fittings','Have the lift checked before loading']}
+    ]},
+    {step:'Lift / hoist scaffold material to height',hazards:[
+      {h:'Load falling from the hoist or gin wheel',sev:'High',c:['Inspect lifting rope, wheel and knots before use','Do not exceed the rated load of the hoist','Keep the area below the lift clear and barriered']},
+      {h:'Manual handling while landing materials at height',sev:'Medium',c:['Land loads onto a boarded, protected platform','Avoid over-reaching to receive the load','Limit individual component weights']}
+    ]},
+    {step:'Board out & install the working platform',hazards:[
+      {h:'Falls through gaps or trap-ended boards',sev:'High',c:['Fully board the platform with no gaps','Secure boards against uplift; avoid short overhangs','Check minimum board overlap / support spacing']},
+      {h:'Slips & trips on the platform',sev:'Medium',c:['Keep the platform free of debris and offcuts','Avoid trailing ropes and leads across the deck','Ensure adequate lighting for the working level']}
+    ]},
+    {step:'Fit guardrails, toe boards & ties',hazards:[
+      {h:'Persons or objects falling from open edges',sev:'High',c:['Install double guardrails and toe boards to all open edges','Do not use the platform until edge protection is complete','Tie the scaffold to the structure as designed']},
+      {h:'Inadequate ties causing structural failure',sev:'High',c:['Install ties at the design frequency and pattern','Use suitable tie types for the facade','Have ties checked by a competent person']}
+    ]},
+    {step:'Inspect, tag & hand over the scaffold',hazards:[
+      {h:'Use of an incomplete or unsafe scaffold',sev:'High',c:['Display a Scafftag / status tag at every access point','Do not release for use until inspected by a competent person','Record the handover inspection']},
+      {h:'Unauthorised modification after handover',sev:'Medium',c:['Make clear only competent scaffolders may alter it','Re-inspect after any alteration or adverse weather','Brief users on safe access and load limits']}
+    ]}
+  ]
+},
+{
+  match:['excavat','trench','dig','dewater'],
+  steps:[
+    {step:'Locate & mark underground services',hazards:[
+      {h:'Striking live electrical, gas or water services',sev:'High',c:['Use up-to-date service drawings and a CAT & Genny scan','Hand-dig trial holes to confirm service positions','Treat all buried services as live until proven dead']},
+      {h:'Gas release / fire & explosion on service strike',sev:'High',c:['Avoid mechanical digging near marked services','Have emergency contacts and procedures to hand','Eliminate ignition sources from the dig area']}
+    ]},
+    {step:'Set up the work area & exclusion zones',hazards:[
+      {h:'Pedestrians / public falling into the excavation',sev:'High',c:['Barrier the full perimeter with rigid edge protection','Provide adequate lighting and signage','Cover or fence the excavation when unattended']},
+      {h:'Plant & vehicles too close to the edge',sev:'High',c:['Keep spoil and plant back from the edge','Use stop blocks for tipping vehicles','Maintain a banksman for reversing plant']}
+    ]},
+    {step:'Excavate to the required depth',hazards:[
+      {h:'Collapse of unsupported excavation walls',sev:'High',c:['Install trench support (shoring / boxes) or batter the sides','Never enter an unsupported excavation','Have a competent person design the support']},
+      {h:'Persons struck by the excavator bucket / slew',sev:'High',c:['Maintain an exclusion zone around the machine','No personnel within the slewing radius','Use a banksman to coordinate digging']},
+      {h:'Spoil falling back into the excavation',sev:'Medium',c:['Place spoil at least one metre from the edge','Use toe boards at the excavation edge','Remove loose material from the walls']}
+    ]},
+    {step:'Manage water, dust & atmosphere',hazards:[
+      {h:'Flooding / water ingress into the excavation',sev:'Medium',c:['Provide pumps and a dewatering plan','Monitor weather and rising water levels','Suspend work if the excavation floods']},
+      {h:'Hazardous / oxygen-deficient atmosphere in deep dig',sev:'High',c:['Gas-test deep or enclosed excavations before entry','Provide forced ventilation where required','Treat deep trenches as potential confined spaces']}
+    ]},
+    {step:'Access, work in & exit the excavation',hazards:[
+      {h:'Falls while accessing the excavation',sev:'High',c:['Provide secured ladders within 25 m of the work','Maintain three points of contact on ladders','Inspect access for damage each shift']},
+      {h:'Manual handling of pipes / bedding materials',sev:'Medium',c:['Lower materials in mechanically, not by hand','Use lifting accessories for heavy pipes','Avoid working bent over for long periods']}
+    ]},
+    {step:'Backfill, reinstate & demobilise',hazards:[
+      {h:'Struck by plant during backfilling',sev:'High',c:['Keep clear of compaction plant and tipping vehicles','Use a banksman to coordinate','Wear high-visibility clothing']},
+      {h:'Hand-arm vibration from compaction equipment',sev:'Medium',c:['Limit trigger time on vibrating compactors','Rotate operators and take breaks','Use low-vibration, well-maintained equipment']}
+    ]}
+  ]
+},
+{
+  match:['hot work','weld','grind','cutting','cut ','brazing','soldering','flame'],
+  steps:[
+    {step:'Obtain permit & prepare the work area',hazards:[
+      {h:'Fire from combustible materials near the work',sev:'High',c:['Clear combustibles within at least 10 m or screen them','Issue and follow a hot work permit','Provide a suitable fire extinguisher at the point of work']},
+      {h:'Work in an area with flammable atmosphere',sev:'High',c:['Gas-test the atmosphere before starting','Purge / ventilate vessels and confined areas','Prohibit hot work where flammable vapours may be present']}
+    ]},
+    {step:'Set up & inspect equipment',hazards:[
+      {h:'Gas leaks from cylinders, hoses & regulators',sev:'High',c:['Leak-test connections and inspect hoses for damage','Fit flashback arrestors to oxy-fuel sets','Store and secure cylinders upright, valves uppermost']},
+      {h:'Electric shock from welding plant',sev:'High',c:['Inspect leads, holders and return clamps before use','Use RCD protection and avoid damp conditions','Ensure good earthing / work-return connection']}
+    ]},
+    {step:'Carry out cutting / grinding / welding',hazards:[
+      {h:'Sparks, hot slag & molten metal burns',sev:'High',c:['Wear flame-resistant PPE, gauntlets and apron','Use fire blankets / screens to contain sparks','Direct sparks away from people and combustibles']},
+      {h:'Eye damage from arc flash, UV & flying particles',sev:'High',c:['Wear the correct shade welding filter / face shield','Screen the arc to protect bystanders','Wear impact-rated eye protection for grinding']},
+      {h:'Inhalation of welding fume & dust',sev:'High',c:['Use local exhaust ventilation (fume extraction)','Wear appropriate RPE for the process','Position yourself out of the fume plume']},
+      {h:'Abrasive wheel disintegration',sev:'Medium',c:['Only trained persons to change wheels','Check wheel speed rating and guards before use','Inspect the wheel for damage before fitting']}
+    ]},
+    {step:'Post-work fire watch & make safe',hazards:[
+      {h:'Smouldering / delayed ignition after work stops',sev:'High',c:['Maintain a fire watch for at least 60 minutes','Recheck the area before final sign-off','Isolate and make equipment safe']},
+      {h:'Hot metal / equipment causing contact burns',sev:'Medium',c:['Allow components to cool or mark them "HOT"','Use tongs / gloves to handle hot work pieces','Cordon off hot materials until cool']}
+    ]}
+  ]
+},
+{
+  match:['height','roof','ladder','mewp','cherry picker','fall','elevated','tower'],
+  steps:[
+    {step:'Plan access & select work-at-height equipment',hazards:[
+      {h:'Selecting unsuitable access for the task',sev:'High',c:['Follow the hierarchy: avoid, prevent, then minimise falls','Select the right platform (MEWP / tower / scaffold) for the job','Ensure equipment is inspected and within examination date']},
+      {h:'Adverse weather affecting work at height',sev:'Medium',c:['Check wind speed limits for the equipment','Stop work in high winds, ice or storms','Monitor conditions throughout the task']}
+    ]},
+    {step:'Set up the work platform / access equipment',hazards:[
+      {h:'Equipment overturning on soft / uneven ground',sev:'High',c:['Site on firm, level ground; use spreader pads','Deploy outriggers / stabilisers fully','Do not exceed the rated platform load']},
+      {h:'Incorrectly assembled access tower',sev:'High',c:['Erect to manufacturer instructions by trained persons','Use the recognised safe build method','Tag and inspect before first use']}
+    ]},
+    {step:'Access the working position',hazards:[
+      {h:'Falls while climbing / transferring to the platform',sev:'High',c:['Maintain three points of contact on ladders','Only exit a MEWP at height where assessed and safe','Keep gates / guardrails closed']},
+      {h:'Ladder slipping or footing failure',sev:'Medium',c:['Foot or tie ladders and set at the correct angle','Inspect ladders before use; remove damaged ones','Use ladders only for light, short-duration work']}
+    ]},
+    {step:'Carry out the work at height',hazards:[
+      {h:'Falls from the open edge / platform',sev:'High',c:['Work within guardrails / edge protection at all times','Clip on a fall-arrest harness in a MEWP','Never climb or stand on guardrails']},
+      {h:'Dropped tools & materials striking persons below',sev:'High',c:['Establish and barrier an exclusion zone below','Use tool lanyards and closed containers','Fit toe boards / brick guards to platforms']},
+      {h:'Fragile surfaces (roof lights / sheets) giving way',sev:'High',c:['Identify and clearly mark fragile areas','Use crawl boards / staging to spread load','Provide guardrails or covers to fragile panels']}
+    ]},
+    {step:'Lower, dismantle & make the area safe',hazards:[
+      {h:'Injury during dismantling / lowering of equipment',sev:'Medium',c:['Lower components in a controlled manner','Maintain exclusion zones during take-down','Inspect and store equipment correctly']}
+    ]}
+  ]
+},
+{
+  match:['electric','wiring','cable','isolat','switchgear','panel','voltage'],
+  steps:[
+    {step:'Plan the work & confirm scope of isolation',hazards:[
+      {h:'Working on assumed-dead but live circuits',sev:'High',c:['Identify all sources of supply before starting','Plan a safe isolation procedure','Only allow competent / authorised persons to work']}
+    ]},
+    {step:'Isolate, lock off & prove dead',hazards:[
+      {h:'Electric shock / electrocution from live conductors',sev:'High',c:['Isolate, lock off and apply a caution tag','Prove dead with a proving unit and approved tester','Apply earths where required before work']},
+      {h:'Inadvertent re-energisation during work',sev:'High',c:['Use a personal lock and unique key (LOTO)','Retain control of the isolation point','Verify isolation with all affected parties']}
+    ]},
+    {step:'Carry out the electrical work',hazards:[
+      {h:'Arc flash / arc blast burns',sev:'High',c:['Wear arc-rated PPE appropriate to the energy level','Maintain safe approach distances','De-energise wherever reasonably practicable']},
+      {h:'Manual handling of heavy panels / cable drums',sev:'Medium',c:['Use mechanical aids for heavy equipment','Team-lift and use correct technique','Plan cable pulling routes to reduce strain']},
+      {h:'Cuts from tools, glands & cable stripping',sev:'Low',c:['Use the correct, insulated hand tools','Wear suitable gloves when handling cable','Keep cutting edges directed away from the body']}
+    ]},
+    {step:'Test, energise & restore supply',hazards:[
+      {h:'Shock / damage during initial energisation',sev:'High',c:['Complete inspection & testing before energising','Warn and clear all persons before switching on','Re-energise in a controlled, planned sequence']},
+      {h:'Unsafe condition left for next user',sev:'Medium',c:['Replace all covers and barriers','Remove locks/tags only when fully safe','Record the work and test results']}
+    ]}
+  ]
+},
+{
+  match:['lift','crane','hoist','rigging','sling','load'],
+  steps:[
+    {step:'Plan the lift & appoint roles',hazards:[
+      {h:'Inadequate planning leading to lift failure',sev:'High',c:['Produce a lift plan for the operation','Appoint a competent appointed person / supervisor','Define crane, slinger and signaller roles clearly']}
+    ]},
+    {step:'Set up & inspect lifting equipment',hazards:[
+      {h:'Crane overturning on poor ground',sev:'High',c:['Assess ground bearing and use outrigger mats','Set up on firm, level ground','Do not exceed the rated capacity for the radius']},
+      {h:'Failure of slings, chains or accessories',sev:'High',c:['Inspect all lifting accessories before use','Check current examination / certification','Use correct SWL-rated gear for the load']}
+    ]},
+    {step:'Rig & attach the load',hazards:[
+      {h:'Load slipping or becoming unbalanced',sev:'High',c:['Identify the centre of gravity and rig accordingly','Use correct sling angles and packing on edges','Trial-lift slightly to confirm balance']},
+      {h:'Hands trapped while attaching slings',sev:'Medium',c:['Keep hands clear of pinch points when taking the strain','Wear gloves','Use tag lines rather than hands to steady loads']}
+    ]},
+    {step:'Carry out the lift & travel the load',hazards:[
+      {h:'Persons struck by the load or under the load',sev:'High',c:['Keep all persons out of the exclusion zone / drop area','Never travel a load over people','Use tag lines to control the load from a distance']},
+      {h:'Contact with overhead power lines / structures',sev:'High',c:['Plan the lift path clear of obstructions and lines','Maintain safe clearances; use a signaller','Stop the lift if visibility or comms are lost']},
+      {h:'Loss of communication between crew',sev:'Medium',c:['Agree clear hand / radio signals beforehand','Only one nominated signaller directs the crane','Stop on any unclear or "stop" signal from anyone']}
+    ]},
+    {step:'Land, de-rig & stand down',hazards:[
+      {h:'Load instability when landing / unslinging',sev:'Medium',c:['Land onto firm, level supports / dunnage','Do not unsling until the load is stable','Keep clear until the load is fully set down']}
+    ]}
+  ]
+},
+{
+  match:['confined','tank','vessel','manhole','chamber','sewer','silo'],
+  steps:[
+    {step:'Assess the space & obtain entry permit',hazards:[
+      {h:'Entry without recognising it as a confined space',sev:'High',c:['Identify confined spaces and avoid entry if possible','Issue and follow a confined space entry permit','Only trained, authorised persons may enter']}
+    ]},
+    {step:'Isolate & test the atmosphere',hazards:[
+      {h:'Toxic / flammable / oxygen-deficient atmosphere',sev:'High',c:['Test the atmosphere before and continuously during entry','Provide forced ventilation','Isolate and lock off all incoming services / flows']}
+    ]},
+    {step:'Set up entry, rescue & communications',hazards:[
+      {h:'No means of rescue if entrant collapses',sev:'High',c:['Station a trained top-man / attendant outside','Provide rescue equipment (tripod, winch, harness)','Maintain continuous communication with the entrant']},
+      {h:'Engulfment by liquids / free-flowing solids',sev:'High',c:['Isolate and blank all inflows','Empty and clean the space before entry','Use a fall-arrest / retrieval system']}
+    ]},
+    {step:'Enter & carry out the work',hazards:[
+      {h:'Loss of consciousness from changing atmosphere',sev:'High',c:['Wear suitable RPE / breathing apparatus where required','Keep continuous gas monitoring running','Evacuate immediately on any alarm']},
+      {h:'Restricted access hampering escape',sev:'Medium',c:['Keep entry routes clear of equipment and hoses','Limit the number and time of entrants','Pre-plan and practise emergency egress']}
+    ]},
+    {step:'Exit, account for personnel & make safe',hazards:[
+      {h:'Person left inside / unaccounted for',sev:'High',c:['Maintain an entry / exit log at the access point','Account for all persons and equipment on exit','Close, secure and sign off the space']}
+    ]}
+  ]
+}
+];
+
+/* ----- Generic keyword hazard modules for non-templated tasks ----- */
+const GENERIC_STEPS = [
+  {step:'Transport & handle materials / equipment to the work area',hazards:[
+    {h:'Manual handling injuries (back, strains, crush)',sev:'High',c:['Use mechanical aids (trolleys, hoists) where possible','Team-lift heavy or awkward loads; use correct technique','Reduce carrying distances and clear the route first']},
+    {h:'Struck by moving vehicles / plant during transport',sev:'High',c:['Segregate pedestrians from vehicle routes','Wear high-visibility clothing','Use a banksman for reversing / blind movements']},
+    {h:'Falling or shifting loads',sev:'Medium',c:['Secure and restrain loads before moving','Stack on firm, level ground','Do not exceed safe stacking heights']}
+  ]},
+  {step:'Inspect & prepare the work area',hazards:[
+    {h:'Slips, trips & falls on the access route',sev:'Medium',c:['Keep walkways clear of trailing leads and debris','Provide adequate lighting','Clean up spills immediately']},
+    {h:'Uncontrolled access by others / public',sev:'Medium',c:['Barrier and sign the work area','Set up exclusion zones as needed','Brief affected persons before starting']},
+    {h:'Adverse weather / environmental conditions',sev:'Low',c:['Check the forecast and plan around conditions','Stop work in unsafe weather','Provide shelter, hydration and breaks']}
+  ]},
+  {step:'Set up tools, plant & equipment',hazards:[
+    {h:'Defective or uninspected equipment',sev:'Medium',c:['Inspect tools and equipment before use','Remove and tag out defective items','Use only equipment within inspection date']},
+    {h:'Electric shock from portable equipment / leads',sev:'High',c:['Use RCD protection and visually check leads','Use reduced-voltage (110 V) tools where available','Keep cables clear of water and traffic']},
+    {h:'Noise from plant & power tools',sev:'Medium',c:['Wear suitable hearing protection','Select quieter equipment where possible','Limit exposure time and rotate tasks']}
+  ]},
+  {step:'Carry out the main task activity',hazards:[
+    {h:'Contact with moving / rotating parts',sev:'High',c:['Keep guards fitted and in place','Keep hands and clothing clear of moving parts','Isolate before clearing blockages or adjusting']},
+    {h:'Hand injuries — cuts, abrasions, punctures',sev:'Medium',c:['Wear appropriate cut-resistant gloves','Use the correct tool for the task','Keep cutting edges directed away from the body']},
+    {h:'Dust, fumes or hazardous substance exposure',sev:'High',c:['Use extraction / suppression at the source','Wear suitable RPE per the COSHH assessment','Ensure good ventilation in the work area']},
+    {h:'Fatigue & loss of concentration',sev:'Low',c:['Plan regular breaks and rotate tasks','Do not work excessive hours on safety-critical tasks','Stop if unwell or impaired']}
+  ]},
+  {step:'Housekeeping, clean-down & demobilise',hazards:[
+    {h:'Slips & trips from leftover materials / waste',sev:'Medium',c:['Clear waste and materials as you go','Segregate and remove waste to designated points','Leave the area clean and safe for others']},
+    {h:'Manual handling during clean-down',sev:'Medium',c:['Use aids to remove heavy waste / equipment','Avoid over-reaching into skips or bins','Team-lift where needed']},
+    {h:'Equipment left in an unsafe condition',sev:'Low',c:['Isolate, switch off and store equipment safely','Report any defects found during the task','Confirm the area is safe before leaving']}
+  ]}
+];
+
+/* Keyword modules merged into generic builds when relevant */
+const KEYWORD_MODULES = [
+  {kw:['paint','spray','coat','varnish'],hazards:[
+    {h:'Inhalation of solvent vapours / paint mist',sev:'High',c:['Provide ventilation or extraction','Wear suitable RPE for solvents / isocyanates','Follow the substance COSHH assessment']},
+    {h:'Fire from flammable solvents',sev:'High',c:['Remove ignition sources from the area','Store solvents in closed, labelled containers','Keep a suitable extinguisher to hand']}
+  ]},
+  {kw:['chemical','acid','solvent','coshh','clean'],hazards:[
+    {h:'Skin / eye contact with hazardous substances',sev:'High',c:['Wear chemical-resistant gloves and eye protection','Follow the COSHH assessment and safety data sheet','Provide eyewash / washing facilities nearby']}
+  ]},
+  {kw:['saw','blade','timber','wood','carpentr'],hazards:[
+    {h:'Lacerations / amputation from cutting blades',sev:'High',c:['Keep blade guards fitted and use push sticks','Only trained persons to operate cutting machinery','Isolate before changing blades']}
+  ]},
+  {kw:['water','river','marine','flood','dock'],hazards:[
+    {h:'Drowning from falling into water',sev:'High',c:['Provide and wear buoyancy aids near deep water','Install rescue equipment (throw lines, ring buoys)','Never work alone next to water']}
+  ]}
+];
+
+/* ============================================================
+   GENERATION LOGIC
+   ============================================================ */
+function clampModel(steps){
+  steps = steps.slice(0,10);                       // <=10 steps
+  steps.forEach(s=>{
+    s.hazards = s.hazards.slice(0,5);              // <=5 hazards
+    s.hazards.forEach(h=>{ h.c = h.c.slice(0,3); }); // <=3 controls
+  });
+  return steps;
+}
+
+function buildModel(desc){
+  const text = desc.toLowerCase();
+  for(const t of TEMPLATES){
+    if(t.match.some(m=>text.includes(m))){
+      return clampModel(JSON.parse(JSON.stringify(t.steps)));
+    }
+  }
+  // Generic build + relevant keyword modules
+  const steps = JSON.parse(JSON.stringify(GENERIC_STEPS));
+  KEYWORD_MODULES.forEach(mod=>{
+    if(mod.kw.some(k=>text.includes(k))){
+      steps[3].hazards = steps[3].hazards.concat(JSON.parse(JSON.stringify(mod.hazards)));
+    }
+  });
+  return clampModel(steps);
+}
+
+/* ============================================================
+   STATE & UI
+   ============================================================ */
+let MODEL=[], TASK='', cur=0;
+
+const $=id=>document.getElementById(id);
+const stages={dash:$('stage-dash'),flow:$('stage-flow'),result:$('stage-result')};
+function show(name){
+  Object.values(stages).forEach(s=>s.classList.remove('active'));
+  stages[name].classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* dates */
+const today=new Date().toISOString().slice(0,10);
+$('todayDate').textContent=today;
+$('footMeta').textContent='Generated '+new Date().toLocaleString();
+
+/* example chips */
+const EXAMPLES=['Scaffold erection','Excavation & trenching','Hot work / welding',
+  'Working at height on a roof','Electrical isolation & wiring','Crane lifting operation',
+  'Confined space entry','Painting & spraying'];
+const chipBox=$('chips');
+EXAMPLES.forEach(ex=>{
+  const c=document.createElement('button');
+  c.className='chip';c.type='button';c.textContent=ex;
+  c.onclick=()=>{$('taskDesc').value=ex;$('taskDesc').focus();};
+  chipBox.appendChild(c);
+});
+
+/* ---- Start ---- */
+$('startBtn').onclick=()=>{
+  const desc=$('taskDesc').value.trim();
+  TASK = desc || 'Daily task (general)';
+  MODEL = buildModel(TASK);
+  cur=0;
+  $('flowTask').textContent='“'+TASK+'”';
+  renderPips();
+  renderStep();
+  show('flow');
+};
+
+/* ---- Flow ---- */
+function renderPips(){
+  const box=$('pips');box.innerHTML='';
+  MODEL.forEach((_,i)=>{
+    const p=document.createElement('div');
+    p.className='pip'+(i<cur?' done':'')+(i===cur?' current':'');
+    box.appendChild(p);
+  });
+}
+function renderStep(){
+  const s=MODEL[cur];
+  const pct=Math.round(((cur+1)/MODEL.length)*100);
+  $('progFill').style.width=pct+'%';
+  $('progPct').textContent=pct+'%';
+  $('progLabel').textContent='Step '+(cur+1)+' of '+MODEL.length;
+  renderPips();
+
+  let html='<span class="step-tag"><span class="step-num">STEP '+(cur+1)+'</span> TASK STEP</span>';
+  html+='<h3>'+esc(s.step)+'</h3>';
+  html+='<p class="kicker" style="margin-top:18px;">Identify Hazards · Associated Controls</p>';
+  html+='<div class="haz-list">';
+  s.hazards.forEach((h,i)=>{
+    html+='<div class="haz sev-'+h.sev+'" style="animation-delay:'+(i*70)+'ms">';
+    html+='<div class="haz-top"><span class="haz-name">'+esc(h.h)+'</span>'+
+          '<span class="sev-badge">'+h.sev+' risk</span></div>';
+    html+='<div class="ctrl-wrap"><div class="ct-label">Associated Controls</div><ul>';
+    h.c.forEach(c=>html+='<li>'+esc(c)+'</li>');
+    html+='</ul></div></div>';
+  });
+  html+='</div>';
+  $('stepCard').innerHTML=html;
+
+  $('prevBtn').disabled = cur===0;
+  $('nextBtn').textContent = (cur===MODEL.length-1)?'Finish & View Table ✓':'Next Step ›';
+}
+$('nextBtn').onclick=()=>{
+  if(cur<MODEL.length-1){cur++;renderStep();window.scrollTo({top:0,behavior:'smooth'});}
+  else{ buildResult(); show('result'); }
+};
+$('prevBtn').onclick=()=>{ if(cur>0){cur--;renderStep();window.scrollTo({top:0,behavior:'smooth'});} };
+$('skipBtn').onclick=()=>{ buildResult(); show('result'); };
+
+/* ---- Results ---- */
+function buildResult(){
+  $('resultTask').textContent=TASK;
+
+  let nHaz=0,nCtrl=0,nHigh=0;
+  MODEL.forEach(s=>s.hazards.forEach(h=>{nHaz++;nCtrl+=h.c.length;if(h.sev==='High')nHigh++;}));
+  $('stats').innerHTML=
+    stat(MODEL.length,'Task Steps')+stat(nHaz,'Hazards Identified')+
+    stat(nCtrl,'Control Measures')+stat(nHigh,'High-Risk Hazards');
+
+  const body=$('resultBody');body.innerHTML='';
+  MODEL.forEach((s,si)=>{
+    s.hazards.forEach((h,hi)=>{
+      const tr=document.createElement('tr');
+      let cells='';
+      if(hi===0){
+        cells+='<td class="col-step" rowspan="'+s.hazards.length+'">'+
+               '<span class="sidx">'+(si+1)+'</span>'+esc(s.step)+'</td>';
+      }
+      cells+='<td class="col-haz"><div class="hz">'+esc(h.h)+
+             ' <span class="mini '+h.sev+'">'+h.sev+'</span></div></td>';
+      cells+='<td class="col-ctrl"><ul>'+h.c.map(c=>'<li>'+esc(c)+'</li>').join('')+'</ul></td>';
+      tr.innerHTML=cells;
+      body.appendChild(tr);
+    });
+  });
+}
+function stat(n,t){return '<div class="stat"><div class="n">'+n+'</div><div class="t">'+t+'</div></div>';}
+
+/* ---- Navigation buttons on result ---- */
+$('restartBtn').onclick=()=>{show('dash');};
+$('backFlowBtn').onclick=()=>{renderStep();show('flow');};
+$('printBtn').onclick=()=>window.print();
+
+/* ---- Copy table ---- */
+$('copyBtn').onclick=async()=>{
+  const rows=[['Task Steps','Identify Hazards','Severity','Associated Controls']];
+  MODEL.forEach((s,si)=>s.hazards.forEach((h,hi)=>{
+    rows.push([
+      hi===0?(si+1)+'. '+s.step:'',
+      h.h, h.sev, h.c.map(c=>'• '+c).join('\n')
+    ]);
+  }));
+  const tsv=rows.map(r=>r.join('\t')).join('\n');
+  const html=tableHTML();
+  try{
+    if(navigator.clipboard && window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html':new Blob([html],{type:'text/html'}),
+        'text/plain':new Blob([tsv],{type:'text/plain'})
+      })]);
+    }else{
+      await navigator.clipboard.writeText(tsv);
+    }
+    toast('Table copied to clipboard');
+  }catch(e){
+    // Fallback: legacy execCommand
+    const ta=document.createElement('textarea');ta.value=tsv;document.body.appendChild(ta);
+    ta.select();document.execCommand('copy');ta.remove();
+    toast('Table copied to clipboard');
+  }
+};
+function tableHTML(){
+  let h='<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;font-family:sans-serif">';
+  h+='<caption style="text-align:left;font-weight:bold;margin-bottom:6px">Daily Task: '+esc(TASK)+'</caption>';
+  h+='<thead><tr><th>Task Steps</th><th>Identify Hazards</th><th>Associated Controls</th></tr></thead><tbody>';
+  MODEL.forEach((s,si)=>s.hazards.forEach((haz,hi)=>{
+    h+='<tr>';
+    if(hi===0)h+='<td rowspan="'+s.hazards.length+'"><b>'+(si+1)+'.</b> '+esc(s.step)+'</td>';
+    h+='<td>'+esc(haz.h)+' ('+haz.sev+')</td>';
+    h+='<td><ul>'+haz.c.map(c=>'<li>'+esc(c)+'</li>').join('')+'</ul></td></tr>';
+  }));
+  h+='</tbody></table>';
+  return h;
+}
+
+/* ---- CSV download ---- */
+$('csvBtn').onclick=()=>{
+  const rows=[['Daily Task',TASK],[],
+    ['Task Steps','Identify Hazards','Severity','Associated Controls']];
+  MODEL.forEach((s,si)=>s.hazards.forEach((h,hi)=>{
+    rows.push([
+      hi===0?(si+1)+'. '+s.step:'',
+      h.h, h.sev, h.c.join(' | ')
+    ]);
+  }));
+  const csv=rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='TasHazCon_'+slug(TASK)+'_'+today+'.csv';
+  document.body.appendChild(a);a.click();a.remove();
+  URL.revokeObjectURL(url);
+  toast('CSV file downloaded');
+};
+function csvCell(v){v=String(v==null?'':v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function slug(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'task';}
+
+/* ---- helpers ---- */
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+let toastTimer;
+function toast(msg){
+  const t=$('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2400);
+}
+
+/* keyboard: Enter (with Ctrl) on textarea to start */
+$('taskDesc').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();$('startBtn').click();}
+});
+</script>
+</body>
+</html>
